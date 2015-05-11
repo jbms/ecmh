@@ -235,6 +235,24 @@ struct QuadraticExtension {
   }
 
   template <class ElementT, JBMS_ENABLE_IF(is_element_or_double<ElementT>)>
+  friend bool is_zero_constant_time(QuadraticExtension const &F, ElementT const &x)
+  {
+    return is_zero_constant_time(F.base_field(), get<0>(x) | get<1>(x));
+  }
+
+  template <class ElementT, JBMS_ENABLE_IF(is_element_or_double<ElementT>)>
+  friend ElementT select_constant_time(QuadraticExtension const &F, ElementT const &a, ElementT const &b, bool condition) {
+    return { { select_constant_time(F.base_field(), get<0>(a), get<0>(b), condition),
+               select_constant_time(F.base_field(), get<1>(a), get<1>(b), condition) } };
+  }
+
+  template <class ElementT, JBMS_ENABLE_IF(is_element_or_double<ElementT>)>
+  friend void assign_random(QuadraticExtension const &F, ElementT &x) {
+    assign_random(F.base_field(), get<0>(x));
+    assign_random(F.base_field(), get<1>(x));
+  }
+
+  template <class ElementT, JBMS_ENABLE_IF(is_element_or_double<ElementT>)>
   friend bool is_one(QuadraticExtension const &F, ElementT const &x) {
     return is_one(F.base_field(), get<0>(x)) && is_zero(F.base_field(), get<1>(x));
   }
@@ -894,6 +912,10 @@ struct QuadraticExtension {
   friend void set_bit(QuadraticExtension const &F, Element &a, size_t i, bool value) {
     size_t degree = F.degree();
     set_bit(F.base_field(), a[i / degree], i % degree, value);
+  }
+
+  friend void set_in_qs_image(QuadraticExtension const &F, Element &x) {
+    set_in_qs_image(F.base_field(), x[0]);
   }
 
 private:

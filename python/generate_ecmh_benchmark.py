@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 import os
 
-def write_benchmark(out_name, curve, hash):
+def write_benchmark(out_name, curve, hash, blinded):
     with open(out_name + '.tmp', 'w') as out:
         lines = [
             '#include "test/multiset_hash/benchmark_generic_multiset_hash.hpp"\n',
@@ -12,11 +12,11 @@ def write_benchmark(out_name, curve, hash):
             'int main(int argc, char **argv) {{\n',
             '  using Curve = jbms::binary_elliptic_curve::{curve};\n',
             '  using Hash = jbms::hash::{hash_name};\n',
-            '  jbms::multiset_hash::ECMH<Curve, Hash> ecmh;\n',
+            '  jbms::multiset_hash::ECMH<Curve, Hash, {blinded}> ecmh;\n',
             '  jbms::multiset_hash::benchmark_generic_multiset_hash(ecmh);\n',
             '  jbms::multiset_hash::benchmark_binary_field_assign_hash<Curve::Field,Hash>();\n',
             '}}\n']
-        out.write(''.join(lines).format(curve = curve, hash_name = hash))
+        out.write(''.join(lines).format(curve = curve, hash_name = hash, blinded = 'true' if blinded else 'false'))
     os.rename(out_name + '.tmp', out_name)
 
 if __name__ == '__main__':
@@ -26,5 +26,6 @@ if __name__ == '__main__':
     parser.add_argument('--out_name', help = 'output path for C++ benchmark source file', required = True)
     parser.add_argument('--curve', type = str, help = 'Curve type name', required = True)
     parser.add_argument('--hash', type = str, help = 'Hash name', required = True)
+    parser.add_argument('--blinded', help = 'Use blinded implementation', action = 'store_true')
 
     write_benchmark(**parser.parse_args().__dict__)

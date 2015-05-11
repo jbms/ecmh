@@ -3,6 +3,7 @@
 
 #include "jbms/benchmark.hpp"
 #include "jbms/binary_elliptic_curve/sw.hpp"
+#include "jbms/binary_elliptic_curve/sw_blinded.hpp"
 #include "jbms/binary_elliptic_curve/add.hpp"
 #include "jbms/binary_elliptic_curve/compress_point.hpp"
 #include "./rand_point_not_infinity.hpp"
@@ -63,12 +64,29 @@ __attribute__((noinline)) void test_sw_map(Curve const &curve,
   if (C) map(curve, encoder, result, w);
 }
 
+template <bool C, class Curve>
+__attribute__((noinline)) void test_sw_map_blinded(Curve const &curve,
+                                           sw::Encoder<Curve> const &encoder,
+                                           LambdaAffinePoint<Curve> &result,
+                                           typename Curve::Field::Element const &w) {
+  __asm__ volatile("");
+  if (C) map_blinded(curve, encoder, result, w);
+}
+
 template <bool C, class Curve, class OutputIterator, class InputRange>
 __attribute__((noinline)) void test_sw_map_batch(Curve const &curve,
                                                  sw::Encoder<Curve> const &encoder,
                                                  OutputIterator output_it, InputRange const &w_range) {
   __asm__ volatile("");
   if (C) batch_map(curve, encoder, output_it, w_range);
+}
+
+template <bool C, class Curve, class OutputIterator, class InputRange>
+__attribute__((noinline)) void test_sw_map_batch_blinded(Curve const &curve,
+                                                 sw::Encoder<Curve> const &encoder,
+                                                 OutputIterator output_it, InputRange const &w_range) {
+  __asm__ volatile("");
+  if (C) batch_map_blinded(curve, encoder, output_it, w_range);
 }
 
 
@@ -159,6 +177,13 @@ void benchmark_elliptic_curve(Curve const &curve) {
                            test_sw_map<C()>(curve, encoder, result_aff, w);
                        },
                        batch_size);
+
+    benchmark_function("sw_blinded",
+                       [&](auto C) {
+                         for (auto &&w : w_arr)
+                           test_sw_map_blinded<C()>(curve, encoder, result_aff, w);
+                       },
+                       batch_size);
   }
 
   auto do_sw_batch = [&](size_t batch_size) {
@@ -169,7 +194,11 @@ void benchmark_elliptic_curve(Curve const &curve) {
     benchmark_function("sw_batch" + std::to_string(batch_size),
                        [&](auto C) { test_sw_map_batch<C()>(curve, encoder, &result_arr[0], w_arr); },
                        batch_size);
-  };
+
+    benchmark_function("sw_batch_blinded" + std::to_string(batch_size),
+                       [&](auto C) { test_sw_map_batch_blinded<C()>(curve, encoder, &result_arr[0], w_arr); },
+                       batch_size);
+};
 
   for (size_t batch_size = 32; batch_size <= 256; batch_size *= 2) {
     do_sw_batch(batch_size);

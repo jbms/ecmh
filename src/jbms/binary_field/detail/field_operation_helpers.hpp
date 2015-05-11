@@ -526,6 +526,12 @@ JBMS_BINARY_FIELD_DEFINE_OP_CASE(/*template params*/(size_t n, class Field),
                                  (One const &),
 { set_one(F, result); })
 
+// Dummy declaration so that set_trace_zero can be found by ADL.
+inline void set_trace_zero(std::nullptr_t) {}
+
+// Dummy declaration so that set_in_qs_image can be found by ADL.
+inline void set_in_qs_image(std::nullptr_t) {}
+
 }
 }
 

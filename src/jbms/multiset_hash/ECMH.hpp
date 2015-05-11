@@ -2,6 +2,7 @@
 #define HEADER_GUARD_5830dc5f99a3ae4c49a642f70168aa02
 
 #include "jbms/binary_elliptic_curve/sw.hpp"
+#include "jbms/binary_elliptic_curve/sw_blinded.hpp"
 #include "jbms/binary_elliptic_curve/compress_point.hpp"
 #include "jbms/binary_field/assign_hash.hpp"
 #include "jbms/binary_elliptic_curve/add.hpp"
@@ -12,14 +13,14 @@
 namespace jbms {
 namespace multiset_hash {
 
-template <class Curve_, class Hash_>
+template <class Curve_, class Hash_, bool blinded = false>
 class ECMH;
 
-template <class Curve_, class Hash_>
-struct is_multiset_hash<ECMH<Curve_,Hash_>> : std::true_type{};
+template <class Curve_, class Hash_, bool blinded>
+struct is_multiset_hash<ECMH<Curve_,Hash_,blinded>> : std::true_type{};
 
 
-template <class Curve_, class Hash_>
+template <class Curve_, class Hash_, bool blinded>
 class ECMH {
 public:
   using Curve = Curve_;
@@ -65,7 +66,8 @@ public:
     FE hx;
     assign_hash(ecmh.curve().field(), ecmh.hash(), hx, x);
     jbms::binary_elliptic_curve::LambdaAffinePoint<Curve> fhx;
-    map(ecmh.curve(), ecmh.encoder(), fhx, hx);
+    using jbms::binary_elliptic_curve::sw::map;
+    map<blinded>(ecmh.curve(), ecmh.encoder(), fhx, hx);
     add(ecmh.curve(), state, state, fhx);
   }
 
@@ -81,9 +83,8 @@ public:
       return hx;
     };
     auto w_range = element_range | boost::adaptors::transformed(transform_element);
-    batch_map(ecmh.curve(), ecmh.encoder(),
-              boost::make_function_output_iterator(handle_fhx),
-              w_range);
+    using jbms::binary_elliptic_curve::sw::batch_map;
+    batch_map<blinded>(ecmh.curve(), ecmh.encoder(), boost::make_function_output_iterator(handle_fhx), w_range);
   }
 
   friend void add_hash(ECMH const &ecmh, State &state, State const &x) {
@@ -94,7 +95,8 @@ public:
     FE hx;
     assign_hash(ecmh.curve().field(), ecmh.hash(), hx, x);
     jbms::binary_elliptic_curve::LambdaAffinePoint<Curve> fhx;
-    map(ecmh.curve(), ecmh.encoder(), fhx, hx);
+    using jbms::binary_elliptic_curve::sw::map;
+    map<blinded>(ecmh.curve(), ecmh.encoder(), fhx, hx);
     negate(ecmh.curve(), fhx, fhx);
     add(ecmh.curve(), state, state, fhx);
   }
@@ -111,11 +113,9 @@ public:
       return hx;
     };
     auto w_range = element_range | boost::adaptors::transformed(transform_element);
-    batch_map(ecmh.curve(), ecmh.encoder(),
-              boost::make_function_output_iterator(handle_fhx),
-              w_range);
+    using jbms::binary_elliptic_curve::sw::batch_map;
+    batch_map<blinded>(ecmh.curve(), ecmh.encoder(), boost::make_function_output_iterator(handle_fhx), w_range);
   }
-
 
   friend void remove_hash(ECMH const &ecmh, State &state, State const &x) {
     add(ecmh.curve(), state, state, negate(ecmh.curve(), x));

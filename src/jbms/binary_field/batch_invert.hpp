@@ -2,6 +2,7 @@
 #define HEADER_GUARD_b7dccc883a4b8c7f52e22f517acca323
 
 #include "./detail/field_operation_helpers.hpp"
+#include "./invert_blinded.hpp"
 #include "jbms/array_view.hpp"
 #include <boost/iterator/iterator_traits.hpp>
 #include <boost/range/functions.hpp>
@@ -23,19 +24,19 @@ namespace binary_field {
  * However, output and input must either overlap completely or not at all; a partial overlap is not permitted.
  **/
 
-#define JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT(enable_condition, buffer_declaration)                                            \
+#define JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT(invert_fn, enable_condition, buffer_declaration)                                 \
   template <class Field,                                                                                                       \
             class OutputIterator,                                                                                              \
             class InputRange,                                                                                                  \
             JBMS_ENABLE_IF_C(is_field<Field>::value &&enable_condition &&                                                      \
                                  std::is_same<typename Field::Element,                                                         \
                                               typename boost::range_value<std::remove_reference_t<InputRange>>::type>::value)> \
-  void batch_invert(Field const &F, OutputIterator output_it, InputRange const &input) {                                       \
+  void batch_##invert_fn(Field const &F, OutputIterator output_it, InputRange const &input) {                                  \
     size_t sz = boost::size(input);                                                                                            \
     if (sz == 0)                                                                                                               \
       return;                                                                                                                  \
     if (sz == 1) {                                                                                                             \
-      *output_it = invert(F, *boost::begin(input));                                                                            \
+      *output_it = invert_fn(F, *boost::begin(input));                                                                         \
       return;                                                                                                                  \
     }                                                                                                                          \
     using FE = typename Field::Element;                                                                                        \
@@ -52,7 +53,7 @@ namespace binary_field {
       ++temp_it;                                                                                                               \
     }                                                                                                                          \
     multiply(F, cumulative, cumulative, *input_it);                                                                            \
-    invert(F, cumulative, cumulative);                                                                                         \
+    invert_fn(F, cumulative, cumulative);                                                                                      \
     --temp_it;                                                                                                                 \
     auto input_end_minus_2 = boost::prior(boost::prior(boost::end(input)));                                                    \
     while (input_it != input_end_minus_2) {                                                                                    \
@@ -72,9 +73,15 @@ namespace binary_field {
 
 // clang doesn't allow runtime-bound arrays of non-POD types, so we need a separate heap-allocating implementation
 // This code gets instantiated during testing with jbms::openssl::bignum
-JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT(std::is_pod<typename Field::Element>::value, FE temp_buffer[sz-2])
-JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT(!std::is_pod<typename Field::Element>::value, std::vector<FE> temp_buffer(sz-2))
+#define JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT2(invert_fn)                                                               \
+  JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT(invert_fn, std::is_pod<typename Field::Element>::value, FE temp_buffer[sz - 2]) \
+      JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT(                                                                            \
+          invert_fn, !std::is_pod<typename Field::Element>::value, std::vector<FE> temp_buffer(sz - 2))                 \
+      /**/
+JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT2(invert)
+JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT2(invert_blinded)
 
+#undef JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT2
 #undef JBMS_BINARY_FIELD_DEFINE_BATCH_INVERT
 
 }

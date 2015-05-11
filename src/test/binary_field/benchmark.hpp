@@ -8,6 +8,8 @@
 #include <random>
 #include "jbms/binary_field/detail/apply_linear_table_transform.hpp"
 #include "jbms/binary_field/batch_invert.hpp"
+#include "jbms/binary_field/invert_blinded.hpp"
+#include "jbms/binary_field/solve_quadratic_blinded.hpp"
 #include "jbms/benchmark.hpp"
 #include <boost/range/functions.hpp>
 #include "jbms/static_repeat.hpp"
@@ -50,6 +52,13 @@ __attribute__((noinline)) void test_invert(T &result, T const &a) {
   if (C) invert(F, result, a);
 }
 
+template <bool C, class Field, class T>
+__attribute__((noinline)) void test_invert_blinded(T &result, T const &a) {
+  __asm__ volatile("");
+  Field F;
+  if (C) invert_blinded(F, result, a);
+}
+
 void invert_inline(...);
 
 template <bool C, class Field, class T>
@@ -77,6 +86,13 @@ __attribute__((noinline)) void test_batch_invert(Output &&output, Input const &i
   if (C) batch_invert(F, boost::begin(output), input);
 }
 
+template <bool C, class Field, class Output, class Input>
+__attribute__((noinline)) void test_batch_invert_blinded(Output &&output, Input const &input) {
+  __asm__ volatile("");
+  Field F;
+  if (C) batch_invert_blinded(F, boost::begin(output), input);
+}
+
 template <bool C, class Field, class T>
 __attribute__((noinline)) bool test_trace(T const &a) {
   __asm__ volatile("");
@@ -90,6 +106,13 @@ __attribute__((noinline)) void test_solve_quadratic(T &result, T const &a) {
   __asm__ volatile("");
   Field F;
   if (C) solve_quadratic(F, result, a);
+}
+
+template <bool C, class Field, class T>
+__attribute__((noinline)) void test_solve_quadratic_blinded(T &result, T const &a) {
+  __asm__ volatile("");
+  Field F;
+  if (C) solve_quadratic_blinded(F, result, a);
 }
 
 template <class Field>
@@ -434,6 +457,7 @@ void run_benchmarks() {
 #endif
 
   benchmark_function_foreach_simple("invert", [&](auto C, auto &&e) { test_invert<C(),Field>(a, e); }, examples);
+  benchmark_function_foreach_simple("invert_blinded", [&](auto C, auto &&e) { test_invert_blinded<C(),Field>(a, e); }, examples);
 
 #if 0
   static_repeat<20>([&](auto i_minus_1) {
@@ -449,11 +473,13 @@ void run_benchmarks() {
 
   benchmark_function("trace", [&](auto C) { test_trace<C(),Field>(a); });
   benchmark_function_foreach_simple("solve_quadratic", [&](auto C, auto &&e) { test_solve_quadratic<C(),Field>(a, e); }, examples);
+  benchmark_function_foreach_simple("solve_quadratic_blinded", [&](auto C, auto &&e) { test_solve_quadratic_blinded<C(),Field>(a, e); }, examples);
 
   static_repeat<9>([&](auto i) {
     constexpr size_t n = size_t(1) << i();
     std::vector<FE> input(n, one(F)), output(n);
     benchmark_function("batch_invert" + std::to_string(n), [&](auto C) { test_batch_invert<C(), Field>(output, input); }, n);
+    benchmark_function("batch_invert_blinded" + std::to_string(n), [&](auto C) { test_batch_invert_blinded<C(), Field>(output, input); }, n);
   });
 
 }

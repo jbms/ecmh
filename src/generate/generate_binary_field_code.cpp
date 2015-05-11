@@ -114,13 +114,17 @@ struct CodeWriter {
           << "  return (";
     bool first_bit = true;
     size_t degree = F.degree();
+    size_t first_trace_bit = 0;
     for (size_t i = 0; i < degree; ++i) {
       FE x;
       x.set_zero();
       x.set_bit(i);
       if (trace(F, x)) {
-        if (!first_bit)
+        if (!first_bit) {
           h_out << "^";
+        } else {
+          first_trace_bit = i;
+        }
         first_bit = false;
         auto vec_i = i / limb_bits;
         auto vec_off = i % limb_bits;
@@ -131,6 +135,18 @@ struct CodeWriter {
       }
     }
     h_out << ") & 0x1;\n}\n";
+
+    // Function that returns value x' = x if Tr(x) = 0, and otherwise differs from x only in one bit.
+    h_out << "inline void set_trace_zero(" << field_name << " const &F, BinaryPolynomial<" << F.degree() << "> &x) {\n";
+    {
+      size_t i = first_trace_bit;
+      auto vec_i = i / limb_bits;
+      auto vec_off = i % limb_bits;
+      auto word_i = vec_off / word_bits;
+      auto word_off = vec_off % word_bits;
+      h_out << "x.limbs[" << vec_i << "][" << word_i << "] ^= (word_t(trace(F, x)) << " << word_off << ");\n";
+    }
+    h_out << "}\n";
     close_ns(h_out);
   }
 
@@ -254,7 +270,10 @@ struct CodeWriter {
   void write_half_trace(size_t block_bits) {
     auto m = F.degree();
     auto name = "half_trace_table_GF2_" + modulus_with_underscores;
-    write_linear_operation_table(name, block_bits, [&](FE const &x) { return half_trace(F, x); });
+    write_linear_operation_table(name, block_bits, [&](FE const &x) {
+        auto result = half_trace(F, x);
+        return result;
+      });
 
     open_ns(h_out);
     h_out << "inline void half_trace(" << field_name << " const &F, BinaryPolynomial<" << m << "> &result, BinaryPolynomial<" << m

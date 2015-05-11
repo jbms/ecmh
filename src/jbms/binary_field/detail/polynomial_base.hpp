@@ -14,6 +14,8 @@
 #include <boost/algorithm/hex.hpp>
 #include "jbms/logical.hpp"
 
+#include "jbms/ctr_drbg.hpp"
+
 namespace jbms {
 namespace binary_field {
 
@@ -169,6 +171,39 @@ inline bool is_zero(BinaryPolynomial<Bits> const &a) {
 }
 
 template <size_t Bits>
+inline bool is_zero_constant_time(BinaryPolynomial<Bits> const &x) {
+  limb_t combined = x.limbs[0];
+  for (size_t i = 1; i < x.num_limbs; ++i)
+    combined |= x.limbs[i];
+  return is_zero_constant_time(combined);
+}
+
+template <size_t Bits>
+inline BinaryPolynomial<Bits> select_constant_time(BinaryPolynomial<Bits> const &a,
+                                                   BinaryPolynomial<Bits> const &b,
+                                                   bool condition) {
+  BinaryPolynomial<Bits> result;
+  for (size_t i = 0; i < result.num_limbs; ++i)
+    result.limbs[i] = select_constant_time(a.limbs[i], b.limbs[i], condition);
+  return result;
+}
+
+template <size_t Bits>
+inline BinaryPolynomial<Bits> operator|(BinaryPolynomial<Bits> const &a,
+                                        BinaryPolynomial<Bits> const &b) {
+  BinaryPolynomial<Bits> result;
+  for (size_t i = 0; i < result.num_limbs; ++i)
+    result.limbs[i] = a.limbs[i] | b.limbs[i];
+  return result;
+}
+
+template <size_t Bits>
+inline void assign_random(BinaryPolynomial<Bits> &result) {
+  ctr_drbg_generate(result.limbs);
+  result.limbs[result.num_limbs-1] &= result.last_limb_mask();
+}
+
+template <size_t Bits>
 inline bool is_one(BinaryPolynomial<Bits> const &a) {
   BinaryPolynomial<Bits> x;
   set_one(x);
@@ -190,8 +225,8 @@ void assign(endian_wrapper<Dest,boost::endian::order::little> dest,
 
   BinaryPolynomial<Bits> temp = x;
   for (auto &limb : temp.limbs) {
-    limb[0] = boost::endian::little_endian_value(limb[0]);
-    limb[1] = boost::endian::little_endian_value(limb[1]);
+    limb[0] = boost::endian::native_to_little(limb[0]);
+    limb[1] = boost::endian::native_to_little(limb[1]);
   }
   std::copy_n((uint8_t const *)temp.limbs, dest.data.size(), dest.data.data());
 }
@@ -207,8 +242,8 @@ void assign(endian_wrapper<Dest,boost::endian::order::big> dest,
   // reverse order of limbs
   std::reverse_copy(&x.limbs[0], &x.limbs[x.num_limbs], &temp.limbs[0]);
   for (auto &limb : temp.limbs) {
-    auto temp = boost::endian::big_endian_value(limb[1]);
-    limb[1] = boost::endian::big_endian_value(limb[0]);
+    auto temp = boost::endian::native_to_big(limb[1]);
+    limb[1] = boost::endian::native_to_big(limb[0]);
     limb[0] = temp;
   }
   std::copy_n(((uint8_t *)&temp.limbs[temp.num_limbs]) - temp.num_bytes, dest.data.size(), dest.data.data());
@@ -220,12 +255,13 @@ void assign(BinaryPolynomial<Bits> &x, endian_wrapper<Source,boost::endian::orde
   size_t num_bytes = std::min(source_size, x.num_bytes);
   set_zero(x);
   uint8_t *result_ptr = (uint8_t *)&x.limbs[0];
+  // Reverse input bytes, so that we end up with a little-endian representation.
   for (size_t i = 0; i < num_bytes; ++i)
     result_ptr[i] = source.data[source_size-i-1];
-  // Convert endian
+  // Convert to native endian.
   for (auto &limb : x.limbs) {
-    limb[0] = boost::endian::little_endian_value(limb[0]);
-    limb[1] = boost::endian::little_endian_value(limb[1]);
+    limb[0] = boost::endian::little_to_native(limb[0]);
+    limb[1] = boost::endian::little_to_native(limb[1]);
   }
   x.limbs[x.num_limbs-1] &= x.last_limb_mask();
 }
@@ -238,10 +274,10 @@ void assign(BinaryPolynomial<Bits> &x, endian_wrapper<Source,boost::endian::orde
   uint8_t *result_ptr = (uint8_t *)&x.limbs[0];
   for (size_t i = 0; i < num_bytes; ++i)
     result_ptr[i] = source.data[i];
-  // Convert endian
+  // Convert to native endian.
   for (auto &limb : x.limbs) {
-    limb[0] = boost::endian::little_endian_value(limb[0]);
-    limb[1] = boost::endian::little_endian_value(limb[1]);
+    limb[0] = boost::endian::little_to_native(limb[0]);
+    limb[1] = boost::endian::little_to_native(limb[1]);
   }
   x.limbs[x.num_limbs-1] &= x.last_limb_mask();
 }

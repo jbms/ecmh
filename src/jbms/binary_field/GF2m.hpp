@@ -30,6 +30,7 @@ struct GF2m {
   // first element is degree of field
   std::vector<int> modulus;
   mutable jbms::openssl::bn_ctx ctx;
+  size_t first_trace_bit = 0;
 
   size_t degree() const { return (size_t)modulus.front(); }
   size_t num_bytes() const { return div_ceil(degree(), 8); }
@@ -47,13 +48,24 @@ struct GF2m {
         throw std::invalid_argument("modulus must be a positive, decreasing sequence");
     }
     this->modulus.push_back(-1);
+
+    // Determine first trace bit.
+    for (size_t i = 0; i < degree(); ++i) {
+      Element x;
+      x.set_bit((int)i, true);
+      if (trace(*this, x)) {
+        first_trace_bit = i;
+        break;
+      }
+    }
   }
   GF2m(GF2m const &other)
-    : modulus(other.modulus)
+    : modulus(other.modulus), first_trace_bit(other.first_trace_bit)
   {}
   GF2m(GF2m &&other) = default;
   GF2m &operator=(GF2m const &other) {
     modulus = other.modulus;
+    first_trace_bit = other.first_trace_bit;
     return *this;
   }
   GF2m &operator=(GF2m &&other) = default;
@@ -223,6 +235,16 @@ struct GF2m {
     return x;
   }
 
+  friend void assign_random(GF2m const &F, Element &x) { rand(F, x); }
+
+  friend void set_trace_zero(GF2m const &F, Element &x) {
+    x.set_bit(F.first_trace_bit, x.is_bit_set(F.first_trace_bit) ^ trace(F, x));
+  }
+
+  friend void set_in_qs_image(GF2m const &F, Element &x) {
+    // Only works if (D.degree() % 2) == 1.
+    set_trace_zero(F, x);
+  }
 };
 
 }

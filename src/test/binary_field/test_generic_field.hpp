@@ -4,6 +4,7 @@
 #include <boost/test/unit_test.hpp>
 #include "jbms/binary_field/rand_element.hpp"
 #include "jbms/binary_field/batch_invert.hpp"
+#include "jbms/binary_field/solve_quadratic_blinded.hpp"
 
 namespace jbms {
 namespace binary_field {
@@ -134,6 +135,10 @@ void test_generic_field_properties(Field const &F) {
     if (!trace(F, a)) {
       auto v = solve_quadratic(F, a);
       REQUIRE_HEX_EQUAL(add(F, v, square(F, v)), a);
+
+      FE v2;
+      solve_quadratic_blinded(F, v2, a);
+      REQUIRE_HEX_EQUAL(v, v2);
     }
 
     for (int batch_size = 0; batch_size < 10; ++batch_size) {

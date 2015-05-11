@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 2.8)
 
+# Define: -DBENCHMARK_INVERSION_CHAINS  for full inversion chain benchmarks.
+
 set(RUN_BENCHMARK
   CACHE STRING "Command prefix for running benchmarks")
 
@@ -112,6 +114,7 @@ function(benchmark_binary_field_core_operations)
     )
 
   add_executable("${test_name}" "${bench_cpp_out}")
+  target_link_libraries("${test_name}" ${OPENSSL_LIBRARIES})
   add_arch_flags("${test_name}")
   set(result "benchmark_results/${test_name}")
   set(result_target "benchmark_results__${test_name}")
@@ -166,6 +169,7 @@ function(benchmark_binary_field field_name field_header_basename)
     )
 
   add_executable("${test_name}" "${bench_cpp_out}" ${_bench_arg_DEPENDENCIES})
+  target_link_libraries("${test_name}" ${OPENSSL_LIBRARIES})
   target_link_libraries("${test_name}" ${field_header_basename})
   add_dependencies(benchmarks "${test_name}")  
 endfunction()
@@ -256,6 +260,7 @@ function(define_base_binary_field_library field_name suffix chain_data)
   set(obj_lib ${field_name}${suffix})
 
   add_library(${obj_lib} STATIC ${cpp_out})
+  target_link_libraries(${obj_lib} ${OPENSSL_LIBRARIES})
   add_arch_flags("${obj_lib}")
 
   set(test_name "test_${field_name}${suffix}")
@@ -287,7 +292,10 @@ function(define_binary_field)
   set(benchmark_data "${CMAKE_CURRENT_BINARY_DIR}/benchmark_results/benchmark_core_${field_name}")
 
   benchmark_binary_field_core_operations(${ARGN})
-  define_binary_field_inversion_chain_options(${ARGN})
+  
+  if (BENCHMARK_INVERSION_CHAINS)
+    define_binary_field_inversion_chain_options(${ARGN})
+  endif()
 
   # Inverse variants
   set(inverse_variants none unoptimized single multi)
@@ -336,8 +344,10 @@ function(define_binary_field)
 
   endforeach() # foreach inverse variant
 
-  define_binary_field_inversion_chain_benchmark("benchmark_${field_name}_inverse-variants" "${all_chains}" ${ARGN})
-  add_dependencies(benchmark_inverse_variants "benchmark_${field_name}_inverse-variants")
+  if (BENCHMARK_INVERSION_CHAINS)
+    define_binary_field_inversion_chain_benchmark("benchmark_${field_name}_inverse-variants" "${all_chains}" ${ARGN})
+    add_dependencies(benchmark_inverse_variants "benchmark_${field_name}_inverse-variants")
+  endif()
 endfunction()
 
 function(define_binary_field_quadratic_extension m)
@@ -481,47 +491,56 @@ function(define_quadratic_extension_curve curve_name base_field_modulus a b)
   define_binary_elliptic_curve_test_and_benchmark(${curve_name})
 endfunction()
 
-function(define_ecmh curve_name hash_name)
+function(define_ecmh curve_name hash_name )
 
-  set(test_name "test_ecmh_${curve_name}_${hash_name}")
-  set(test_gen "${PROJECT_SOURCE_DIR}/python/generate_ecmh_test.py")
-  set(test_cpp_out "${CMAKE_CURRENT_BINARY_DIR}/src/${test_name}.cpp")
-  add_custom_command(
-    OUTPUT "${test_cpp_out}"
-    COMMAND mkdir -p "${CMAKE_CURRENT_BINARY_DIR}/src"
-    COMMAND python2 "${test_gen}" --out_name="${test_cpp_out}" --curve="${curve_name}" --hash="${hash_name}"
-    DEPENDS ${test_gen}
-    )
+  foreach(suffix "" "_blinded")
 
-  add_executable("${test_name}" "${test_cpp_out}")
-  target_link_libraries("${test_name}"
-    ${OPENSSL_LIBRARIES} ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
-    "${hash_name}"
-    "ec_${curve_name}"
-    )
-  set_property(TARGET "${test_name}" PROPERTY COMPILE_DEFINITIONS BOOST_TEST_MAIN BOOST_TEST_DYN_LINK)
+    set(extra_args --blinded)
+    if (suffix STREQUAL "")
+      set(extra_args)
+    endif()
+    
+    set(test_name "test_ecmh_${curve_name}_${hash_name}${suffix}")
+    set(test_gen "${PROJECT_SOURCE_DIR}/python/generate_ecmh_test.py")
+    set(test_cpp_out "${CMAKE_CURRENT_BINARY_DIR}/src/${test_name}${suffix}.cpp")
+    add_custom_command(
+      OUTPUT "${test_cpp_out}"
+      COMMAND mkdir -p "${CMAKE_CURRENT_BINARY_DIR}/src"
+      COMMAND python2 "${test_gen}" --out_name="${test_cpp_out}" --curve="${curve_name}" --hash="${hash_name}" ${extra_args}
+      DEPENDS ${test_gen}
+      )
 
-  add_test("${test_name}" ${RUN_BENCHMARK} "./${test_name}")
+    add_executable("${test_name}" "${test_cpp_out}")
+    target_link_libraries("${test_name}"
+      ${OPENSSL_LIBRARIES} ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY}
+      "${hash_name}"
+      "ec_${curve_name}"
+      )
+    set_property(TARGET "${test_name}" PROPERTY COMPILE_DEFINITIONS BOOST_TEST_MAIN BOOST_TEST_DYN_LINK)
+
+    add_test("${test_name}" ${RUN_BENCHMARK} "./${test_name}")
 
 
-  set(bench_name "benchmark_ecmh_${curve_name}_${hash_name}")
-  set(bench_gen "${PROJECT_SOURCE_DIR}/python/generate_ecmh_benchmark.py")
-  set(bench_cpp_out "${CMAKE_CURRENT_BINARY_DIR}/src/${bench_name}.cpp")
-  add_custom_command(
-    OUTPUT "${bench_cpp_out}"
-    COMMAND mkdir -p "${CMAKE_CURRENT_BINARY_DIR}/src"
-    COMMAND python2 "${bench_gen}" --out_name="${bench_cpp_out}" --curve="${curve_name}" --hash="${hash_name}"
-    DEPENDS ${bench_gen}
-    )
+    set(bench_name "benchmark_ecmh_${curve_name}_${hash_name}${suffix}")
+    set(bench_gen "${PROJECT_SOURCE_DIR}/python/generate_ecmh_benchmark.py")
+    set(bench_cpp_out "${CMAKE_CURRENT_BINARY_DIR}/src/${bench_name}${suffix}.cpp")
+    add_custom_command(
+      OUTPUT "${bench_cpp_out}"
+      COMMAND mkdir -p "${CMAKE_CURRENT_BINARY_DIR}/src"
+      COMMAND python2 "${bench_gen}" --out_name="${bench_cpp_out}" --curve="${curve_name}" --hash="${hash_name}" ${extra_args}
+      DEPENDS ${bench_gen}
+      )
 
-  add_executable("${bench_name}" "${bench_cpp_out}")
-  target_link_libraries("${bench_name}"
-    ${OPENSSL_LIBRARIES}
-    "${hash_name}"
-    "ec_${curve_name}"
-    )
+    add_executable("${bench_name}" "${bench_cpp_out}")
+    target_link_libraries("${bench_name}"
+      ${OPENSSL_LIBRARIES}
+      "${hash_name}"
+      "ec_${curve_name}"
+      )
 
-  add_dependencies(benchmarks "${bench_name}")  
+    add_dependencies(benchmarks "${bench_name}")
+
+  endforeach() # blinded vs regular
 
 endfunction()
 
@@ -617,7 +636,8 @@ target_link_libraries("benchmark_mont_mul" ${OPENSSL_LIBRARIES})
 
 
 foreach(hash blake2s blake2b)
-  foreach(curve GLS254 sect163k1 sect193r1 sect233k1 sect239k1 sect283k1 sect409k1 sect571k1)
+  foreach(curve GLS254 sect163k1 sect193r1 sect233k1 sect239k1 sect283k1 sect409k1 sect571k1
+      )
     define_ecmh(${curve} ${hash})
   endforeach()
 

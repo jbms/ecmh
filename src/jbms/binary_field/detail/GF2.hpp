@@ -26,33 +26,38 @@ struct GF2 {
   using Modulus_seq = std::integer_sequence<size_t, Degree, Coeffs..., 0>;
   static constexpr std::array<size_t, sizeof...(Coeffs) + 2> modulus_arr = { { Degree, Coeffs..., 0 } };
 
-#define DEFINE_GF2_OPS(ElementT)                                                                \
-  friend void assign(GF2 const &F, ElementT &x, bool value) { assign(x, value); }               \
-  friend void set_zero(GF2 const &F, ElementT &x) { set_zero(x); }                              \
-  friend bool is_zero(GF2 const &F, ElementT const &x) { return is_zero(x); }                   \
-  friend void set_one(GF2 const &F, ElementT &x) { set_one(x); }                                \
-  friend bool is_one(GF2 const &F, ElementT const &x) { return is_one(x); }                     \
-  friend bool equal(GF2 const &F, ElementT const &a, ElementT const &b) { return (a == b); }    \
-  friend void add(GF2 const &F, ElementT &x, ElementT const &a, ElementT const &b) {            \
-    x = a;                                                                                      \
-    x += b;                                                                                     \
-  }                                                                                             \
-  friend std::string to_hex(GF2 const &F, ElementT const &a) { return to_hex(a); }              \
-  template <class Range>                                                                        \
-  friend void assign_from_hex(GF2 const &F, ElementT &a, Range const &range) {                  \
-    assign_from_hex(a, range);                                                                  \
-  }                                                                                             \
-  friend std::string to_bin(GF2 const &F, ElementT const &a) { return to_bin(a); }              \
-  template <class Data, boost::endian::order order, JBMS_ENABLE_IF(is_byte_range<Data>)>        \
-  friend void assign(GF2 const &F, ElementT &a, endian_wrapper<Data, order> x) {                \
-    a = x.operator ElementT();                                                                  \
-  }                                                                                             \
-  template <class Data, boost::endian::order order, JBMS_ENABLE_IF(is_byte_range<Data>)>        \
-  friend void assign(GF2 const &F, endian_wrapper<Data, order> x, ElementT const &a) {          \
-    x = a;                                                                                      \
-  }                                                                                             \
-  friend bool get_bit(GF2 const &F, ElementT const &x, size_t i) { return x.get_bit(i); }       \
-  friend void set_bit(GF2 const &F, ElementT &x, size_t i, bool value) { x.set_bit(i, value); } \
+#define DEFINE_GF2_OPS(ElementT)                                                                             \
+  friend void assign(GF2 const &F, ElementT &x, bool value) { assign(x, value); }                            \
+  friend void set_zero(GF2 const &F, ElementT &x) { set_zero(x); }                                           \
+  friend bool is_zero(GF2 const &F, ElementT const &x) { return is_zero(x); }                                \
+  friend void set_one(GF2 const &F, ElementT &x) { set_one(x); }                                             \
+  friend bool is_one(GF2 const &F, ElementT const &x) { return is_one(x); }                                  \
+  friend bool equal(GF2 const &F, ElementT const &a, ElementT const &b) { return (a == b); }                 \
+  friend void add(GF2 const &F, ElementT &x, ElementT const &a, ElementT const &b) {                         \
+    x = a;                                                                                                   \
+    x += b;                                                                                                  \
+  }                                                                                                          \
+  friend std::string to_hex(GF2 const &F, ElementT const &a) { return to_hex(a); }                           \
+  template <class Range>                                                                                     \
+  friend void assign_from_hex(GF2 const &F, ElementT &a, Range const &range) {                               \
+    assign_from_hex(a, range);                                                                               \
+  }                                                                                                          \
+  friend std::string to_bin(GF2 const &F, ElementT const &a) { return to_bin(a); }                           \
+  template <class Data, boost::endian::order order, JBMS_ENABLE_IF(is_byte_range<Data>)>                     \
+  friend void assign(GF2 const &F, ElementT &a, endian_wrapper<Data, order> x) {                             \
+    a = x.operator ElementT();                                                                               \
+  }                                                                                                          \
+  template <class Data, boost::endian::order order, JBMS_ENABLE_IF(is_byte_range<Data>)>                     \
+  friend void assign(GF2 const &F, endian_wrapper<Data, order> x, ElementT const &a) {                       \
+    x = a;                                                                                                   \
+  }                                                                                                          \
+  friend bool get_bit(GF2 const &F, ElementT const &x, size_t i) { return x.get_bit(i); }                    \
+  friend void set_bit(GF2 const &F, ElementT &x, size_t i, bool value) { x.set_bit(i, value); }              \
+  friend bool is_zero_constant_time(GF2 const &F, ElementT const &a) { return is_zero_constant_time(a); }    \
+  friend ElementT select_constant_time(GF2 const &F, ElementT const &a, ElementT const &b, bool condition) { \
+    return select_constant_time(a, b, condition);                                                            \
+  }                                                                                                          \
+  friend void assign_random(GF2 const &F, ElementT &x) { assign_random(x); }                                 \
   /**/
   DEFINE_GF2_OPS(Element)
   DEFINE_GF2_OPS(DoubleElement)
@@ -102,6 +107,11 @@ struct GF2 {
                                    result,
                                    (E const &a),
   { half_trace(F, result, a); });
+
+  template <JBMS_ENABLE_IF_C((Degree % 2) == 1)>
+  friend void set_in_qs_image(GF2 const &F, Element &x) {
+    set_trace_zero(F, x);
+  }
 };
 
 }

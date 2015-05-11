@@ -162,9 +162,29 @@ inline limb_t poly_mul_vec(limb_t a, limb_t b) {
 
 #endif
 
+// #ifdef __RDRND__
 
+// // Returns a 64-bit random value obtained via the RDRAND instruction.  Retries indefinitely.
+// inline uint64_t rdrand64() {
+//   unsigned long long result;
+//   while (!_rdrand64_step(&result))
+//     continue;
+//   return result;
+// }
+// #endif // __RDRND__
 
 }
+
+inline bool is_zero_constant_time(limb_t a) {
+  return _mm_testc_si128((__m128i)limb_t{0,0}, (__m128i)a);
+}
+
+inline limb_t select_constant_time(limb_t a, limb_t b, bool condition) {
+  word_t word_mask = ~(word_t(condition) - 1);
+  limb_t limb_mask{word_mask, word_mask};
+  return (a & limb_mask) | (b & ~limb_mask);
+}
+
 }
 }
 

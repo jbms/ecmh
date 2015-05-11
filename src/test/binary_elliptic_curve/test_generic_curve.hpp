@@ -6,6 +6,7 @@
 #include "jbms/binary_elliptic_curve/compress_point.hpp"
 #include "jbms/binary_elliptic_curve/add.hpp"
 #include "jbms/binary_elliptic_curve/sw.hpp"
+#include "jbms/binary_elliptic_curve/sw_blinded.hpp"
 #include "jbms/assign_endian.hpp"
 #include "jbms/binary_field/rand_element.hpp"
 #include "jbms/openssl/ec.hpp"
@@ -45,12 +46,17 @@ void test_sw_encode(Curve const &curve) {
   int num_iter = 100;
   // Test non-batch
   for (int i = 0; i < num_iter; ++i) {
-    LambdaAffinePoint<Curve> P, P1;
+    LambdaAffinePoint<Curve> P, P_blinded, P1, P1_blinded;
     auto w = pseudo_rand_element(curve.field());
     map(curve, encoder, P, w);
+    map_blinded(curve, encoder, P_blinded, w);
+    REQUIRE_HEX_EQUAL(P, P_blinded);
+
     map(curve, encoder, P1, add(curve.field(), w, one_expr(curve.field())));
+    map(curve, encoder, P1_blinded, add(curve.field(), w, one_expr(curve.field())));
     BOOST_REQUIRE(is_rational(curve, P));
     REQUIRE_HEX_EQUAL(P, P1);
+    REQUIRE_HEX_EQUAL(P, P1_blinded);
 
     // verify that at least two different points are possible
     LambdaAffinePoint<Curve> Q;
@@ -66,15 +72,23 @@ void test_sw_encode(Curve const &curve) {
 
   // Test c = 0 special case (only applies if Tr(curve.a()) == 0
   if (trace(curve.field(), curve.a()) == 0) {
-    LambdaAffinePoint<Curve> P;
-    map(curve, encoder, P, w_special);
-    BOOST_REQUIRE(equal(curve, P, P_non_lambda));
+    {
+      LambdaAffinePoint<Curve> P;
+      map(curve, encoder, P, w_special);
+      BOOST_REQUIRE(equal(curve, P, P_non_lambda));
+    }
+    {
+      LambdaAffinePoint<Curve> P;
+      map_blinded(curve, encoder, P, w_special);
+      BOOST_REQUIRE(equal(curve, P, P_non_lambda));
+    }
   }
 
   // Test batch
   for (size_t batch_size = 0; batch_size < 10; ++batch_size) {
     std::vector<typename Curve::Field::Element> w_arr(batch_size);
     std::vector<LambdaAffinePoint<Curve>> result_arr(batch_size);
+    std::vector<LambdaAffinePoint<Curve>> result_arr_blinded(batch_size);
     for (size_t j = 0; j < batch_size; ++j)
       w_arr[j] = pseudo_rand_element(curve.field());
 
@@ -87,10 +101,12 @@ void test_sw_encode(Curve const &curve) {
     }
 
     batch_map(curve, encoder, result_arr.begin(), w_arr);
+    batch_map_blinded(curve, encoder, result_arr_blinded.begin(), w_arr);
     for (size_t j = 0; j < batch_size; ++j) {
       LambdaAffinePoint<Curve> result;
       map(curve, encoder, result, w_arr[j]);
       REQUIRE_HEX_EQUAL(result, result_arr[j]);
+      REQUIRE_HEX_EQUAL(result, result_arr_blinded[j]);
     }
   }
 }
