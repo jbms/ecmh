@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <boost/range/size.hpp>
+#include <cmath>
 
 //#define JBMS_BENCHMARK_DEBUG_OUTPUT
 
